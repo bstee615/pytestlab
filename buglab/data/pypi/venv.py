@@ -49,8 +49,8 @@ def create_windows_venv(dir: Path, venv_location: Path, all_package_files: Path,
 
 
 @contextmanager
-def create_venv_and_install(package: str) -> Iterator[PackageLabInfo]:
-    with TemporaryDirectory() as dir:
+def create_venv_and_install(package: str, **tmpdir_kwargs) -> Iterator[PackageLabInfo]:
+    with TemporaryDirectory(**tmpdir_kwargs) as dir:
         dir = Path(dir)
         venv_location = dir / "venv"
         all_package_files = Path(dir) / "pkg-files.txt"
