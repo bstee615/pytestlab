@@ -1,8 +1,10 @@
+import glob
 import logging
 import multiprocessing
 import os
 from os import PathLike
 from pathlib import Path
+import re
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Type, Union
 
 import jedi
@@ -281,3 +283,56 @@ def extract_for_package(
             for ex in extracted_data:
                 samples_published.inc()
                 yield ex
+
+
+def get_package_url(package_name, venv):
+    glob_path = os.path.join(venv.package_location, f"{package_name}-*.dist-info", "METADATA")
+    print("GLOBBING:", glob_path)
+    metadata_fpath = next(iter(glob.glob(glob_path)))
+    with open(metadata_fpath) as f:
+        for line in f:
+            if line.startswith("Project-URL:"):
+                print("GLOBBED LINE:", metadata_fpath, line.strip())
+                m = re.search(r"https://github.com/[^\s/]+/[^\s/]+/?$", line)
+                if m:
+                    print("MATCHED")
+                    return m.group(0)
+
+
+def extract_and_test(
+    package_name: str,
+):
+    """
+    :param package_name: The name of the package.
+    :param bug_selector_server_address: The address of the rewrite selector server.
+    :param push_gateway_address: The address of the Prometheus push gateway.
+    :param deduplication_client: A link to the deduplication server.
+    :param num_semantics_preserving_transformations_per_file: the number of semantics-preserving transforms to
+        make to each input file.
+    """
+
+    with create_venv_and_install(package_name, prefix=os.path.join(os.getcwd(), "pkgs/"), delete=False) as venv:
+        print("INSTALL:", venv.venv_location)
+        # Get project URL
+        source_url = get_package_url(package_name, venv)
+        if source_url is None:
+            print("NO SOURCE URL FOUND")
+            return
+        # Install and run pytest
+        print("CLONING SOURCE:")
+        os.chdir(venv.package_location)
+        os.system(f"git clone {source_url} {package_name}.git")
+        os.chdir(os.path.join(venv.package_location, package_name + ".git"))
+        print("INSTALLING DEPS:")
+        python_exe = os.path.join(venv.venv_location, "bin", "python")
+        os.system(python_exe + " -m pip install -r requirements-dev.txt")
+        os.system(python_exe + " -m pip install -r dev-requirements.txt")
+        print("RUNNING TESTS:")
+        pytest_exe = os.path.join(venv.venv_location, "bin", "pytest")
+        if not os.path.exists(pytest_exe):
+            os.system(python_exe + " -m pip install pytest")
+        os.system(pytest_exe)
+
+if __name__ == "__main__":
+    print("RUNNING")
+    extract_and_test("urllib3")

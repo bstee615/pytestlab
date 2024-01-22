@@ -149,3 +149,5 @@ azurek8s
 *.terraform
 *.tfstate
 *.tfstate.backup
+pkgs/*
+!pkgs/.gitkeep
